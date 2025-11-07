@@ -1,0 +1,36 @@
+# Carregar pacotes
+library(sf)
+library(dplyr)
+library(geobr)
+library(here)
+library(dataCleanML)
+
+# Ler shapefile das regiões intermediárias de MG
+minas_gerais <- st_read(here("dados",
+                             "regioes_intermediarias",
+                             "MG_RG_Intermediarias_2024.shp"))
+
+# Filtrar apenas as regiões desejadas
+tri_oeste <- minas_gerais |>
+  filter(NM_RGINT %in% c("Uberaba", "Uberlândia"))
+
+# Dissolver as fronteiras internas — cria um único polígono
+tri_oeste_limite <- tri_oeste |>
+  st_union() |>          # une todas as geometrias
+  st_make_valid() |>     # garante geometria válida (evita erros topológicos)
+  st_as_sf()             # transforma de novo em objeto sf
+
+# Criar pasta para salvar o resultado, se não existir
+if (!dir.exists("dados/limite")) dir.create("dados/limite")
+
+# Salvar o shapefile do limite unido (sem fronteiras internas)
+st_write(tri_oeste_limite,
+         here("dados", "limite", "limite.shp"),
+         delete_layer = TRUE)
+
+# Se quiser, salve também em formato .RDS
+saveRDS(tri_oeste_limite,
+        file = here("dados", "limite", "limite.RDS"))
+
+limite<-sf::st_read(here::here("dados", "limite", "limite.shp"))
+plot(limite)

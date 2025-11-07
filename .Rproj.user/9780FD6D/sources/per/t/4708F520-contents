@@ -1,0 +1,46 @@
+# Carregar pacotes
+pacman::p_load(sf,
+               dplyr,
+               geobr,
+               here,
+               terra,
+               dataCleanML)
+
+#Mostra a área que será usada como limite ou contorno
+contorno<- sf::read_sf(here("dados", "limite", "limite.shp"))
+plot(contorno)
+
+#A função cria_projeto não está nem funcionando
+cria_projeto(nome = "triangulo",
+             epsg = 	8987,
+             limite = here::here("dados", "limite","limite.shp"),
+             resolucao = 30)
+
+shp = terra::vect(projeto$limite)
+plot(shp)
+
+
+
+
+# Rasterizando camadas vetoriais ------------------------------------------
+#As variáveis de interesse estão armazenadas no formato vetorial; 
+#para utilizá-las em MDS, devemos convertê-las para raster
+
+fn = here::here('dados', 'solos', 'MAPA_SOLOS_MINAS_2010_LAYOUT_UNICO.shp')
+solos = sf::st_read(fn) |> st_drop_geometry()
+str(solos)
+
+vetor_path = here::here('dados', 
+                        'solos', 
+                        'MAPA_SOLOS_MINAS_2010_LAYOUT_UNICO.shp')
+
+info <- readRDS(here::here("trabalho_mapa_681",
+                           "trabalho_mapa_681.RDS"))
+
+
+prep <- prepara_vetor_projeto(
+  vetor_path = vetor_path,
+  campo = solos$UM_simplif,
+  tipo = "categorico",
+  info = info
+)
