@@ -1,0 +1,274 @@
+---
+title: "Trabalho SOL681"
+subtitle: "Pedometria"
+title-block-banner: true
+date: ""
+date-modified: "`r Sys.Date()`"
+author:
+   - name: Jardel Fialho
+     email: jardel.fialho@ufv.br
+     role: "Pós-graduando em Solos e Nutrição de Plantas"
+     affiliation: 
+      - name: Universidade Federal de Viçosa
+        city: Viçosa
+        state: MG
+        uri: www.ufv.br
+reference-location: margin
+citation-location: margin
+tbl-cap-location: bottom
+code-annotations: hover
+lang: pt-BR
+lightbox:
+  match: auto
+  effect: fade
+  desc-position: bottom
+  loop: false
+format:
+  html:
+    theme: default
+    fontsize: 12pt
+    linestretch: 1.5
+    toc: true
+    toc-title: "Sumário"
+    toc-location: left
+    number-sections: true
+    number-depth: 3
+    html-math-method: katex
+    anchor-sections: true
+    smooth-scroll: true
+    citations-hover: true
+    footnotes-hover: true
+    crossrefs-hover: true
+    code-summary: "Ver código"
+    code-fold: false
+    code-line-numbers: true
+    highlight-style: a11y
+    embed-resources: true
+    self-contained-math: true
+execute: 
+  warning: false
+  error: false
+  echo: true
+  cache: false
+editor_options: 
+  chunk_output_type: console
+---
+
+# Pacotes e Preparação do Ambiente
+```{r}
+pacman::p_load(sf,
+  dplyr,
+  geobr,
+  here,
+  terra,
+  dataCleanML,
+  update = F
+)
+```
+
+# Regiões Intermediárias de Minas Gerais
+## Leitura do Shapefile
+```{r}
+minas_gerais <- st_read(here(
+  "dados",
+  "regioes_intermediarias",
+  "MG_RG_Intermediarias_2024.shp"
+))
+```
+
+## Filtro da Região de Interesse
+```{r}
+oeste <- minas_gerais |>
+  filter(NM_RGINT %in% c("Patos de Minas"))
+```
+
+## União e Validação das Geometrias
+```{r}
+oeste_limite <- oeste |>
+  st_union() |> # une todas as geometrias
+  st_make_valid() |> # garante geometria válida (evita erros topológicos)
+  st_as_sf() # transforma de novo em objeto sf
+```
+
+# Exportação e Armazenamento das Camadas
+# Criação de Pasta e Salvamento
+```{r}
+if (!dir.exists("dados/limite")) dir.create("dados/limite")
+
+st_write(
+  oeste_limite,
+  here("dados", "limite", "limite_oeste.shp"),
+  delete_layer = TRUE
+)
+```
+
+## Salvamento em Formato RDS e Visualização
+```{r}
+saveRDS(oeste_limite, file = here("dados", "limite", "limite_oeste.RDS"))
+
+limite <- sf::st_read(here::here("dados", "limite", "limite_oeste.shp"))
+plot(limite)
+```
+
+# Solos
+## Correção do Campo FID
+```{r}
+corrigir_fid <- function(arquivo_entrada, arquivo_saida) {
+  camada <- st_read(arquivo_entrada)
+
+  # Remover campo FID, se existir
+  if ("FID" %in% colnames(camada)) {
+    camada <- select(camada, -FID)
+  }
+
+  # Recriar campo FID sequencial
+  camada$FID <- seq_len(nrow(camada))
+
+  # Sobrescrever arquivo corrigido
+  st_write(camada, arquivo_saida, delete_layer = TRUE)
+}
+
+corrigir_fid(
+  "dados/limite/limite_oeste.shp",
+  "dados/limite/limite_oeste_1.shp"
+)
+```
+
+## Criação do Projeto
+```{r}
+cria_projeto(
+  nome = "oeste",
+  epsg = 31983, # não usar esse EPSG, escolher uma projeção métrica
+  # trabalhar em separado essas áreas separados por fuso
+  limite = here::here("dados", "limite", "limite_oeste_1.shp"),
+  resolucao = 30
+)
+```
+
+## Visualização do Limite da Região Oeste
+```{r}
+projeto <- readRDS(file = "oeste/oeste.RDS")
+shp <- terra::vect(projeto$limite)
+plot(shp)
+```
+
+## Rasterização das Camadas Vetoriais 
+As variáveis de interesse estão no formato vetorial.
+Para utilizá-las em Modelagem Digital do Solo (MDS), é necessário convertê-las para raster.
+```{r}
+fn <- here::here("dados", "solos", "MAPA_SOLOS_MINAS_2010_LAYOUT_UNICO.shp")
+solos <- sf::st_read(fn)
+str(solos)
+
+vetor_path <- here::here("dados", "solos", "MAPA_SOLOS_MINAS_2010_LAYOUT_UNICO.shp")
+info <- readRDS(here::here("oeste", "oeste.RDS"))
+```
+
+### Correção de Geometrias Inválidas
+```{r}
+camada <- st_read(vetor_path)
+camada_corrigida <- st_make_valid(camada)
+
+sf::st_write(
+  obj = camada_corrigida,
+  dsn = here("dados", "solos", "solos_1.shp"),
+  delete_layer = TRUE
+)
+```
+
+## Padronização e Preparação dos Dados de Solo
+### Padronização dos Nomes de Classes
+```{r}
+solos_1_path <- "dados/solos/solos_1.shp"
+solos <- sf::st_read(solos_1_path)
+str(solos)
+
+solos$Legenda <- iconv(x = solos$Legenda, from = "UTF-8", to = "ASCII//TRANSLIT") |>
+  stringr::str_replace_all(" ", "_") |>
+  stringr::str_replace_all("-", "_")
+
+st_write(
+  obj = solos,
+  dsn = here("dados", "solos", "solos_2.shp"),
+  delete_layer = TRUE
+)
+```
+
+### Preparação do Vetor para Rasterização
+```{r}
+solos_2_path <- "dados/solos/solos_2.shp"
+
+prep <- prepara_vetor_projeto(
+  vetor_path = solos_2_path,
+  campo = "Legenda",
+  tipo = "categorico",
+  info = info
+)
+
+tabela_area_por_classe(
+  vetor_path = prep$fnvetor,
+  campo_id = "campo_raster"
+)
+```
+
+## Agrupamento e Reclassificação das Classes de Solo
+```{r}
+grupos <- list(nodata = c("Agua", "Afloramento_rochoso"))
+nome_saida <- here::here(info$vetores, "solos_reclas.gpkg")
+
+vetor_agrupado <- agrupar_classes_shapefile(
+  vetor_path = prep$fnvetor,
+  campo_id   = "campo_raster",
+  grupos     = grupos,
+  nome_saida = nome_saida
+)
+
+tabela_area_por_classe(
+  vetor_path = nome_saida,
+  campo_id = "classe_agrupada"
+)
+```
+
+## Rasterização Final
+```{r}
+rr <- rasteriza_vetor_projeto(
+  vetor_path = nome_saida,
+  tipo = "categorico",
+  info = info,
+  nome_base = prep$nome_base,
+  legenda = prep$legenda,
+  pasta = "covariaveis"
+)
+
+r <- rast(rr)
+terra::plot(
+  r,
+  main = "Mapa de Classes de Solo",
+  plg = list(cex = 0.9)
+)
+```
+
+## Conversão em Raster Binário
+```{r}
+rb <- dataCleanML::raster_categorico_para_stack_binario(
+  raster_path = rr,
+  pasta_saida = here::here(info$covariaveis),
+  nome_saida = "solos_bin.tif"
+)
+
+rrb <- rast(rb)
+terra::plot(
+  rrb,
+  plg = list(cex = 0.9)
+)
+```
+
+# Geologia
+# Geomofologia
+# Uso e cobertura vegetal
+# Variáveis Bioclimáticas
+# Modelos Digitais de Elevação (MDE)
+# Indices espectrais
+
+# Textura do solo
+# Evapotranspiração
