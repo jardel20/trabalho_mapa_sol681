@@ -2,24 +2,24 @@
   <PAMRasterBand band="1">
     <Description>classe_agrupada</Description>
     <CategoryNames>
-      <Category>Argissolo_vermelho</Category>
       <Category>Argissolo_vermelho_amarelo</Category>
-      <Category>Cambissolo_fluvico</Category>
       <Category>Cambissolo_haplico</Category>
-      <Category>Cambissolo_humico</Category>
       <Category>Gleissolo_melanico</Category>
-      <Category>Latossolo_amarelo</Category>
       <Category>Latossolo_vermelho</Category>
       <Category>Latossolo_vermelho_amarelo</Category>
-      <Category>Luvissolo_cromico</Category>
       <Category>Neossolo_fluvico</Category>
       <Category>Neossolo_litolico</Category>
       <Category>Neossolo_quartzarenico</Category>
-      <Category>Nitossolo_haplico</Category>
-      <Category>Nitossolo_vermelho</Category>
-      <Category>Planossolo_haplico</Category>
-      <Category>Plintossolo_argiluvico</Category>
       <Category>nodata</Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
       <Category></Category>
       <Category></Category>
       <Category></Category>
